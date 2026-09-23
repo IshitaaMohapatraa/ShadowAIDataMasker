@@ -1,37 +1,48 @@
-from typing import Dict, List, Tuple
-from src.rules import RULES
+import os
+import re
+import hashlib
+from src.rules import PATTERNS, find_high_entropy_tokens
+
+# Cryptographic salt generated once per server instance lifecycle
+SESSION_SALT = os.urandom(16)
 
 class TextSanitizer:
-    def __init__(self, rules_config: Dict = None):
-        self.rules = rules_config or RULES
+    @staticmethod
+    def generate_vault_key(secret_type: str, raw_value: str) -> str:
+        """Generates a cryptographically salted, unique placeholder token."""
+        salted_bytes = SESSION_SALT + raw_value.encode('utf-8')
+        short_hash = hashlib.sha256(salted_bytes).hexdigest()[:8]
+        return f"[REDACTED_{secret_type}_{short_hash}]"
 
-    def sanitize(self, text: str) -> Tuple[str, List[Dict[str, str]]]:
+    @classmethod
+    def sanitize(cls, text: str) -> tuple[str, dict[str, str]]:
         """
-        Scans input string against regex rules and replaces sensitive tokens.
-        Returns a tuple of (sanitized_text, redacting_log).
+        Sanitizes prompt text by masking sensitive patterns.
+        Returns a tuple of (sanitized_prompt, vault_mapping).
         """
-        if not isinstance(text, str):
-            raise TypeError("Input payload must be a string.")
+        sanitized_prompt = text
+        vault = {}
 
-        sanitized_text = text
-        detections = []
+        # 1. Deterministic Regex Masking
+        for secret_type, pattern in PATTERNS.items():
+            matches = set(re.findall(pattern, sanitized_prompt))
+            for match in matches:
+                # Handle tuple matches from complex regex capture groups
+                raw_match = match[0] if isinstance(match, tuple) else match
+                placeholder = cls.generate_vault_key(secret_type, raw_match)
 
-        for category, pattern in self.rules.items():
-            matches = list(pattern.finditer(sanitized_text))
-            
-            # Process in reverse order to keep correct index offsets
-            for match in reversed(matches):
-                start, end = match.span()
-                matched_val = match.group(0)
-                placeholder = f"[REDACTED_{category}]"
-                
-                # Perform surgical string slice swap
-                sanitized_text = sanitized_text[:start] + placeholder + sanitized_text[end:]
-                
-                detections.append({
-                    "category": category,
-                    "original_snippet": matched_val[:4] + "..." if len(matched_val) > 4 else "***",
-                    "placeholder": placeholder
-                })
+                sanitized_prompt = sanitized_prompt.replace(raw_match, placeholder)
+                vault[placeholder] = raw_match
 
-        return sanitized_text, detections
+        # 2. Heuristic High-Entropy Scanning on Remaining Text
+        high_entropy_tokens = find_high_entropy_tokens(sanitized_prompt)
+        for token in set(high_entropy_tokens):
+            # Avoid re-masking existing redacted placeholders
+            if token.startswith("[REDACTED_"):
+                continue
+
+            placeholder = cls.generate_vault_key("HIGH_ENTROPY_SECRET", token)
+            sanitized_prompt = sanitized_prompt.replace(token, placeholder)
+            vault[placeholder] = token
+
+        return sanitized_prompt, vault

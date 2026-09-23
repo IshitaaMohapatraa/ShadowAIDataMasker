@@ -1,30 +1,50 @@
-from flask import Flask, jsonify, request
+import time
+from flask import Flask, request, jsonify
 from src.sanitizer import TextSanitizer
 
 app = Flask(__name__)
-sanitizer = TextSanitizer()
+
+# Vault store with timestamps: { placeholder: {"value": raw, "timestamp": time.time()} }
+VAULT_STORE = {}
+VAULT_TTL_SECONDS = 900  # 15 minutes
+
+def cleanup_stale_vault_entries():
+  """Purges entries older than the defined TTL."""
+  now = time.time()
+  stale_keys = [
+      k
+      for k, v in VAULT_STORE.items()
+      if now - v["timestamp"] > VAULT_TTL_SECONDS
+  ]
+  for k in stale_keys:
+    del VAULT_STORE[k]
+
 
 @app.route("/sanitize", methods=["POST"])
-def sanitize_prompt():
-    data = request.get_json(silent=True)
-    if not data or "prompt" not in data:
-        return jsonify({"error": "Missing 'prompt' key in JSON payload"}), 400
+def sanitize():
+  cleanup_stale_vault_entries()
+  data = request.get_json() or {}
+  prompt = data.get("prompt", "")
 
-    raw_prompt = data["prompt"]
-    clean_prompt, audit_log = sanitizer.sanitize(raw_prompt)
+  if not prompt:
+    return jsonify({"error": "No prompt provided"}), 400
 
-    return jsonify({
-        "status": "success",
-        "original_length": len(raw_prompt),
-        "sanitized_prompt": clean_prompt,
-        "redactions_count": len(audit_log),
-        "audit_log": audit_log
-    }), 200
+  sanitized_prompt, vault = TextSanitizer.sanitize(prompt)
 
-if __name__ == "__main__":
-    print("--- Shadow AI Sanitizer Engine Online ---")
-    demo_input = "Hey LLM, my OpenAI key is sk-abc123456789012345678901234567890 and email is dev@company.com"
-    clean_out, logs = sanitizer.sanitize(demo_input)
-    print(f"Sample Input : {demo_input}")
-    print(f"Sample Output: {clean_out}\n")
-    app.run(port=5000, debug=True)
+  # Store values with creation timestamp
+  now = time.time()
+  for placeholder, raw_val in vault.items():
+    VAULT_STORE[placeholder] = {"value": raw_val, "timestamp": now}
+
+  return (
+      jsonify({"sanitized_prompt": sanitized_prompt, "vault": vault}),
+      200,
+  )
+
+
+@app.route("/vault", methods=["GET"])
+def get_vault():
+  cleanup_stale_vault_entries()
+  # Return simplified dictionary for response un-masking
+  active_vault = {k: v["value"] for k, v in VAULT_STORE.items()}
+  return jsonify({"vault": active_vault}), 200
