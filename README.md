@@ -23,8 +23,8 @@ Shadow AI Data Masker uses a hybrid client-side interception model combined with
 |                                                                       |
 |  +------------------+    Enter Key Intercept   +-------------------+  |
 |  | Web LLM UI       | -----------------------> | content.js        |  |
-|  | (ChatGPT / Claude|                          | (DOM Interceptor  |  |
-|  | Gemini / DeepSeek|<------------------------ |  & Text Injector) |  |
+|  |(ChatGPT / Claude |                          | (DOM Interceptor  |  |
+|  |Gemini / DeepSeek)|<------------------------ |  & Text Injector) |  |
 |  +------------------+    Injected Redaction    +-------------------+  |
 |           ^                                              |            |
 |           | Un-Masked DOM Text                           | JSON       |
