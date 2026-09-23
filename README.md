@@ -15,6 +15,7 @@ Lightweight, zero-trust Python privacy engine designed to intercept and sanitize
 * **Control Dashboard:** Chrome extension popup equipped with live session telemetry and a global ON/OFF protection toggle.
 
 ## System Architecture
+```
 Shadow AI Data Masker uses a hybrid client-side interception model combined with a lightweight local REST API to ensure zero-trust data sanitization before prompts leave the client's device.
 +-----------------------------------------------------------------------------------+
 |                                  BROWSER CLIENT                                   |
@@ -51,6 +52,7 @@ v
 |  |  '-- Stores Mapping Pair: [REDACTED_TYPE_HASH] <-> Raw Secret (15-Min TTL)    |  |
 |  +-----------------------------------------------------------------------------+  |
 +-----------------------------------------------------------------------------------+
+```
 
 ### Data Flow Lifecycle
 1. **Interception:** `content.js` intercepts the DOM `keydown` event on input editors (supporting rich `contenteditable` and standard `textarea` elements) across supported LLM platforms.
