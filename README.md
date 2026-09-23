@@ -41,16 +41,16 @@ Shadow AI Data Masker uses a hybrid client-side interception model combined with
 |                          LOCAL FLASK ENGINE                           |
 |                                                                       |
 |  +-----------------------------------------------------------------+  |
-|  | TextSanitizer (src/sanitizer.py)                               |  |
-|  |  |-- Deterministic Regex (AWS, OpenAI, PAN, Aadhaar)           |  |
-|  |  |-- Heuristic Shannon Entropy Engine                          |  |
+|  | TextSanitizer (src/sanitizer.py)                                |  |
+|  |  |-- Deterministic Regex (AWS, OpenAI, PAN, Aadhaar)            |  |
+|  |  |-- Heuristic Shannon Entropy Engine                           |  |
 |  |  '-- Salted Token Generator (SHA-256 Hashes)                    |  |
 |  +-----------------------------------------------------------------+  |
 |                                  |                                    |
 |                                  v                                    |
 |  +-----------------------------------------------------------------+  |
 |  | Ephemeral In-Memory Vault (src/app.py)                          |  |
-|  |  '-- Stores Mapping: [REDACTED_TYPE_HASH] <-> Secret (15-Min TTL) |  |
+|  |'-- Stores Mapping: [REDACTED_TYPE_HASH] <-> Secret (15-Min TTL) |  |
 |  +-----------------------------------------------------------------+  |
 +-----------------------------------------------------------------------+
 ```
