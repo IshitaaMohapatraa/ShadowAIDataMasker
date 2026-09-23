@@ -15,43 +15,44 @@ Lightweight, zero-trust Python privacy engine designed to intercept and sanitize
 * **Control Dashboard:** Chrome extension popup equipped with live session telemetry and a global ON/OFF protection toggle.
 
 ## System Architecture
-```
+```text
 Shadow AI Data Masker uses a hybrid client-side interception model combined with a lightweight local REST API to ensure zero-trust data sanitization before prompts leave the client's device.
-+-----------------------------------------------------------------------------------+
-|                                  BROWSER CLIENT                                   |
-|                                                                                   |
-|  +--------------------+    Enter Key Intercept    +----------------------------+  |
-|  | Web LLM UI         | ------------------------> | content.js                 |  |
-|  | (ChatGPT / Claude  |                           | (DOM Event Capture &       |  |
-|  |  Gemini / DeepSeek)| <------------------------ |  Native Input Injector)    |  |
-|  +--------------------+     Injected Redaction    +----------------------------+  |
-|            ^                                                    |                 |
-|            | Un-Masked DOM Text                                 | JSON Payload    |
-|            |                                                    v                 |
-|  +--------------------+                           +----------------------------+  |
-|  | MutationObserver   | <------------------------ | background.js              |  |
-|  | Response Unmasker  |    Local Session Vault    | (MV3 Service Worker)       |  |
-|  +--------------------+                           +----------------------------+  |
-+-----------------------------------------------------------------|-----------------+
-|
-HTTP POST  |  /sanitize
-v
-+-----------------------------------------------------------------------------------+
-|                                 LOCAL FLASK ENGINE                                |
-|                                                                                   |
-|  +-----------------------------------------------------------------------------+  |
-|  | TextSanitizer (src/sanitizer.py)                                           |  |
-|  |  |-- Deterministic Pattern Engine (AWS, OpenAI, PII, PAN, Aadhaar Regex)   |  |
-|  |  |-- Heuristic Entropy Engine (Shannon Entropy Scanner)                     |  |
-|  |  '-- Salted Token Generator (HMAC / Cryptographic SHA-256 Hash Placeholders) |  |
-|  +-----------------------------------------------------------------------------+  |
-|                                         |                                         |
-|                                         v                                         |
-|  +-----------------------------------------------------------------------------+  |
-|  | Ephemeral In-Memory Vault (src/app.py)                                       |  |
-|  |  '-- Stores Mapping Pair: [REDACTED_TYPE_HASH] <-> Raw Secret (15-Min TTL)    |  |
-|  +-----------------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------------+
+
++-----------------------------------------------------------------------+
+|                            BROWSER CLIENT                             |
+|                                                                       |
+|  +------------------+    Enter Key Intercept   +-------------------+  |
+|  | Web LLM UI       | -----------------------> | content.js        |  |
+|  | (ChatGPT / Claude|                          | (DOM Interceptor  |  |
+|  | Gemini / DeepSeek|<------------------------ |  & Text Injector) |  |
+|  +------------------+    Injected Redaction    +-------------------+  |
+|           ^                                              |            |
+|           | Un-Masked DOM Text                           | JSON       |
+|           |                                              v            |
+|  +------------------+                          +-------------------+  |
+|  | MutationObserver | <----------------------- | background.js     |  |
+|  | Response Unmasker|    Local Session Vault   | (MV3 Worker)      |  |
+|  +------------------+                          +-------------------+  |
++----------------------------------------------------------|------------+
+                                                           |
+                                                HTTP POST  |  /sanitize
+                                                           v
++-----------------------------------------------------------------------+
+|                          LOCAL FLASK ENGINE                           |
+|                                                                       |
+|  +-----------------------------------------------------------------+  |
+|  | TextSanitizer (src/sanitizer.py)                               |  |
+|  |  |-- Deterministic Regex (AWS, OpenAI, PAN, Aadhaar)           |  |
+|  |  |-- Heuristic Shannon Entropy Engine                          |  |
+|  |  '-- Salted Token Generator (SHA-256 Hashes)                    |  |
+|  +-----------------------------------------------------------------+  |
+|                                  |                                    |
+|                                  v                                    |
+|  +-----------------------------------------------------------------+  |
+|  | Ephemeral In-Memory Vault (src/app.py)                          |  |
+|  |  '-- Stores Mapping: [REDACTED_TYPE_HASH] <-> Secret (15-Min TTL) |  |
+|  +-----------------------------------------------------------------+  |
++-----------------------------------------------------------------------+
 ```
 
 ### Data Flow Lifecycle
