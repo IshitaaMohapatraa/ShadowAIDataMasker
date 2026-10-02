@@ -1,6 +1,8 @@
 import time
-from flask import Flask, request, jsonify
+import io
+from flask import Flask, request, jsonify, send_file
 from src.sanitizer import TextSanitizer
+from src.image_sanitizer import ImageSanitizer
 
 app = Flask(__name__)
 
@@ -42,6 +44,26 @@ def sanitize():
   )
 
 
+@app.route("/sanitize-image", methods=["POST"])
+def sanitize_image_endpoint():
+    if 'image' not in request.files:
+        return {"error": "No image file provided"}, 400
+    
+    file = request.files['image']
+    image_bytes = file.read()
+
+    try:
+        sanitized_bytes = ImageSanitizer.sanitize_image(image_bytes)
+        return send_file(
+            io.BytesIO(sanitized_bytes),
+            mimetype='image/png',
+            as_attachment=True,
+            download_name='sanitized_upload.png'
+        )
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
 @app.route("/vault", methods=["GET"])
 def get_vault():
   cleanup_stale_vault_entries()
@@ -51,3 +73,8 @@ def get_vault():
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=5000, debug=True)
+
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes so the extension can talk to Flask

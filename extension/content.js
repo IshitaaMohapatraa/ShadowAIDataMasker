@@ -163,6 +163,105 @@ document.addEventListener(
   true // Capture phase
 );
 
+// --- IMAGE INTERCEPTION & OCR REDACTION ---
+// --- UNIVERSAL IMAGE INTERCEPTION & OCR REDACTION ---
+document.addEventListener('paste', handleImageInterception, true);
+document.addEventListener('drop', handleImageInterception, true);
+
+async function handleImageInterception(event) {
+    if (!isMaskingEnabled) return;
+    
+    const items = event.clipboardData?.items || event.dataTransfer?.items;
+    if (!items) return;
+
+    for (let item of items) {
+        if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            const file = item.getAsFile();
+            await uploadAndSwapImage(file, event.target);
+            break;
+        }
+    }
+}
+
+async function uploadAndSwapImage(imageFile, targetElement) {
+    try {
+        console.log("[Shadow AI] Intercepting multi-modal image payload...");
+
+        const reader = new FileReader();
+        reader.readAsDataURL(imageFile);
+        
+        reader.onloadend = async () => {
+            const imageDataUrl = reader.result;
+
+            chrome.runtime.sendMessage(
+                { action: "sanitize_image", imageDataUrl: imageDataUrl },
+                async (response) => {
+                    if (chrome.runtime.lastError || !response || !response.success) {
+                        console.error("[Shadow AI] Image Redaction Error:", response?.error || chrome.runtime.lastError);
+                        alert("Shadow AI Warning: Could not process image redaction. Upload halted for safety.");
+                        return;
+                    }
+
+                    const res = await fetch(response.sanitizedDataUrl);
+                    const sanitizedBlob = await res.blob();
+                    const sanitizedFile = new File([sanitizedBlob], "sanitized_upload.png", { type: "image/png" });
+
+                    const dataTransfer = new DataTransfer();
+                    dataTransfer.items.add(sanitizedFile);
+
+                    // Strategy 1: Search broadly for file inputs across ChatGPT, Claude, and Gemini
+                    let fileInput = document.querySelector('input[type="file"]') || 
+                                    document.querySelector('form input[type="file"]') ||
+                                    document.querySelector('input[accept*="image"]');
+
+                    if (!fileInput) {
+                        const allInputs = document.querySelectorAll('input');
+                        for (let inp of allInputs) {
+                            if (inp.type === 'file') {
+                                fileInput = inp;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (fileInput) {
+                        fileInput.files = dataTransfer.files;
+                        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        fileInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        console.log("[Shadow AI] Scrubbed image successfully injected into file input!");
+                    } else {
+                        // Strategy 2: Gemini Clipboard Paste Fallback
+                        console.log("[Shadow AI] File input missing. Simulating paste event on Gemini target...");
+                        const editableArea = document.querySelector('rich-textarea') || 
+                                             document.querySelector('div[contenteditable="true"]') || 
+                                             targetElement;
+                        
+                        if (editableArea) {
+                            editableArea.focus();
+                            const pasteEvent = new ClipboardEvent('paste', {
+                                bubbles: true,
+                                cancelable: true,
+                                clipboardData: dataTransfer
+                            });
+                            editableArea.dispatchEvent(pasteEvent);
+                            console.log("[Shadow AI] Scrubbed image pasted into Gemini via clipboard event!");
+                        } else {
+                            alert("Shadow AI Warning: Could not locate upload target on Gemini.");
+                        }
+                    }
+                }
+            );
+        };
+    } catch (error) {
+        console.error("[Shadow AI] Image Preparation Error:", error);
+        alert("Shadow AI Warning: Could not process image. Upload halted for safety.");
+    }
+}
+
 // --- UN-MASKING VAULT OBSERVER ---
 function unmaskDOM() {
   if (!chrome.runtime?.id) return;

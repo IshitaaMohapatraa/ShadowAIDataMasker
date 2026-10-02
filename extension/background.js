@@ -34,6 +34,38 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
 
+  if (request.action === "sanitize_image") {
+    // Reconstruct blob from base64 data URL and proxy to Flask backend
+    fetch(request.imageDataUrl)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const formData = new FormData();
+        formData.append("image", blob, "upload.png");
+
+        return fetch("http://127.0.0.1:5000/sanitize-image", {
+          method: "POST",
+          body: formData,
+        });
+      })
+      .then((response) => {
+        if (!response.ok) throw new Error("Server error during image sanitization");
+        return response.blob();
+      })
+      .then((sanitizedBlob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          sendResponse({ success: true, sanitizedDataUrl: reader.result });
+        };
+        reader.readAsDataURL(sanitizedBlob);
+      })
+      .catch((err) => {
+        console.error("[Shadow AI Background Error]:", err);
+        sendResponse({ success: false, error: err.toString() });
+      });
+
+    return true; // Keep channel open for async response
+  }
+
   if (request.action === "get_vault") {
     chrome.storage.session.get("vault").then((res) => {
       sendResponse({ vault: res.vault || {} });
