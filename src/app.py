@@ -48,3 +48,6 @@ def get_vault():
   # Return simplified dictionary for response un-masking
   active_vault = {k: v["value"] for k, v in VAULT_STORE.items()}
   return jsonify({"vault": active_vault}), 200
+
+if __name__ == "__main__":
+    app.run(host="127.0.0.1", port=5000, debug=True)

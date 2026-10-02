@@ -1,5 +1,16 @@
 console.log("[Shadow AI] Universal multi-engine content script loaded.");
 
+// --- STATE CACHE FOR SYNCHRONOUS CHECK ---
+let isMaskingEnabled = true;
+chrome.storage.local.get(["maskingEnabled"], (res) => {
+  if (res.maskingEnabled !== undefined) isMaskingEnabled = res.maskingEnabled;
+});
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.maskingEnabled) {
+    isMaskingEnabled = changes.maskingEnabled.newValue;
+  }
+});
+
 // --- HEURISTIC INPUT FINDER ---
 function getActiveInput() {
   const active = document.activeElement;
@@ -105,50 +116,48 @@ document.addEventListener(
   "keydown",
   (event) => {
     if (event.key === "Enter" && !event.shiftKey) {
-      // Check toggle status before taking action
-      chrome.storage.local.get(["maskingEnabled"], (storage) => {
-        if (storage.maskingEnabled === false) return;
+      if (!isMaskingEnabled) return;
 
-        const inputEl = getActiveInput();
-        if (!inputEl) return;
+      const inputEl = getActiveInput();
+      if (!inputEl) return;
 
-        const rawText = (inputEl.value !== undefined ? inputEl.value : inputEl.innerText) || "";
-        if (!rawText.trim()) return;
+      const rawText = (inputEl.value !== undefined ? inputEl.value : inputEl.innerText) || "";
+      if (!rawText.trim()) return;
 
-        // Skip if already sanitized
-        if (rawText.includes("[REDACTED_")) return;
+      // Skip if already sanitized
+      if (rawText.includes("[REDACTED_")) return;
 
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
+      // Immediately block browser submission before async gap
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
 
-        if (!chrome.runtime?.id) return;
+      if (!chrome.runtime?.id) return;
 
-        chrome.runtime.sendMessage(
-          { action: "sanitize_prompt", prompt: rawText },
-          (response) => {
-            if (chrome.runtime.lastError || !response || !response.success) {
-              console.warn("[Shadow AI] Masking request failed.");
-              return;
-            }
-
-            const cleanPrompt = response.data.sanitized_prompt;
-
-            injectSanitizedText(inputEl, cleanPrompt);
-
-            setTimeout(() => {
-              const submitted = triggerSubmission(inputEl);
-
-              if (!submitted) {
-                const form = inputEl.closest("form");
-                if (form) {
-                  form.requestSubmit ? form.requestSubmit() : form.submit();
-                }
-              }
-            }, 120);
+      chrome.runtime.sendMessage(
+        { action: "sanitize_prompt", prompt: rawText },
+        (response) => {
+          if (chrome.runtime.lastError || !response || !response.success) {
+            console.warn("[Shadow AI] Masking request failed.");
+            return;
           }
-        );
-      });
+
+          const cleanPrompt = response.data.sanitized_prompt;
+
+          injectSanitizedText(inputEl, cleanPrompt);
+
+          setTimeout(() => {
+            const submitted = triggerSubmission(inputEl);
+
+            if (!submitted) {
+              const form = inputEl.closest("form");
+              if (form) {
+                form.requestSubmit ? form.requestSubmit() : form.submit();
+              }
+            }
+          }, 120);
+        }
+      );
     }
   },
   true // Capture phase

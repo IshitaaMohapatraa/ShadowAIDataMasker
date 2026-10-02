@@ -4,7 +4,7 @@ import math
 # --- REGEX PATTERNS FOR KNOWN SECRETS & PII ---
 PATTERNS = {
     # Cloud & API Secrets
-    "OPENAI_API_KEY": r"sk-[a-zA-Z0-9]{32,}",
+    "OPENAI_API_KEY": r"sk-[a-zA-Z0-9]{16,}",
     "AWS_ACCESS_KEY_ID": r"(?:A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}",
     "AWS_SECRET_ACCESS_KEY": r"(?i)aws_secret_access_key\s*=\s*['\"]?([A-Za-z0-9/+=]{40})['\"]?",
     "GITHUB_TOKEN": r"(?:ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36}",

@@ -9,10 +9,8 @@ SESSION_SALT = os.urandom(16)
 class TextSanitizer:
     @staticmethod
     def generate_vault_key(secret_type: str, raw_value: str) -> str:
-        """Generates a cryptographically salted, unique placeholder token."""
-        salted_bytes = SESSION_SALT + raw_value.encode('utf-8')
-        short_hash = hashlib.sha256(salted_bytes).hexdigest()[:8]
-        return f"[REDACTED_{secret_type}_{short_hash}]"
+        """Generates a clean placeholder token without the random hash suffix."""
+        return f"[REDACTED_{secret_type}]"
 
     @classmethod
     def sanitize(cls, text: str) -> tuple[str, dict[str, str]]:
